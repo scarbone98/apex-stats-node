@@ -45,8 +45,31 @@ app.get('/player', (req, res) => {
     request(`https://apex.tracker.gg/profile/${console}/${name}`, (error, response, html) => {
         if (response && response.statusCode === 200) {
             const $ = cheerio.load(html);
+
+
+            /* TODO need to somehow wait before we parse this part */
+
             let result = {};
             let legendsData = [];
+            let lifetime = {};
+            $('div.trn-card__content').find('div.trn-defstat.trn-defstat--large').each((i, el) => {
+                let key = null;
+                let stat = {};
+                $(el).children('div').each((i2, child) =>{
+                    if (i2 === 0) {
+                        key = cleanData($(child).text());
+                    } else if(i2 === 1) {
+                        stat.value = cleanData($(child).text());
+                    } else if (i2 === 2) {
+                        stat.rank = cleanData($(child).text());
+                    }
+                });
+                lifetime[key.toLowerCase()] = stat;
+            });
+            result.lifetime = lifetime;
+
+
+
             $('div.trn-card').find('div.ap-legend-stats').each((i, el) => {
                 let obj = {};
                 $(el).siblings('div').each((i1, header) => {
@@ -59,6 +82,8 @@ app.get('/player', (req, res) => {
                            key = cleanData($(data).text()).toLowerCase();
                        } else if(i3 === 1) {
                            obj[key] = cleanData($(data).text());
+                       } else if(i3 === 2) {
+                           obj.rank = cleanData($(data).text());
                        }
                     });
                 });
@@ -66,6 +91,9 @@ app.get('/player', (req, res) => {
             });
             result.legends = legendsData;
             res.status(200).send(result);
+
+
+
         } else {
             res.status(500).send(error);
         }
