@@ -23,6 +23,12 @@ app.get('/leaderboard', (req, res) => {
                     } else if (index === 1) {
                         obj.name = cleanData($(col).text());
                         const console = $(el).find('i').attr('class');
+                        const socials = [];
+                        $(el).find('a').each((i, social) => {
+                            socials.push($(social).attr('href'));
+                        });
+                        socials.shift();
+                        obj.socials = socials;
                         if (console.indexOf('windows') >= 0) {
                             obj.console = 'pc';
                         } else if (console.indexOf('xbox') >= 0) {
@@ -59,27 +65,86 @@ app.get('/search', (req, res) => {
         .catch(e => res.status(500).send(e))
 });
 
-function playerStats(console, name) {
-    console = console === 'xbox' ? 'xbl' : console === 'playstation' ? 'psn' : console;
+app.get('/news', (req, res) => {
+    request('https://apex.tracker.gg/', (error, response, html) => {
+        if (response && response.statusCode === 200) {
+            const result = [];
+            const $ = cheerio.load(html);
+            $('article').each((index, article) => {
+                const obj = {};
+                obj.imageURL = $(article).find('img').attr('src');
+                obj.title = cleanData($(article).find('h2').text());
+                obj.preview = cleanData($(article).find('p').text());
+                obj.readMoreLink = 'https://apex.tracker.gg' + $(article).find('div.trn-article__actions').find('a').first().attr('href');
+                result.push(obj);
+            });
+            res.status(200).send(result);
+        } else {
+            res.status(500).send(error);
+        }
+    });
+});
+
+
+app.get('/matches', (req, res) => {
+    const {platform, name} = req.query;
+    request(`https://apex.tracker.gg/profile/${platform}/${name}`, (error, response, html) => {
+        if (response && response.statusCode === 200) {
+            const result = [];
+            const $ = cheerio.load(html);
+            $('div.trn-card.trn-card--dark.ap-match').each((i, match) => {
+                let obj = {};
+                obj.title = cleanData($(match).find('span').text());
+                let stats = {};
+                $(match).find('div.trn-defstat').each((_, stat) => {
+                    let key = null;
+                    $(stat).find('div').each((i3, label) => {
+                        if (i3 === 0) {
+                            key = cleanData($(label).text()).toLowerCase();
+                        } else if (i3 === 1) {
+                            stats[key] = cleanData($(label).text());
+                        }
+                    });
+                });
+                obj.stats = stats;
+                result.push(obj);
+            });
+            res.status(200).send(result);
+        } else {
+            res.status(500).send(error);
+        }
+    });
+});
+
+function playerStats(platform, name) {
+    platform = platform === 'xbox' ? 'xbl' : platform === 'playstation' ? 'psn' : platform;
     return new Promise((resolve, reject) => {
-        request(`https://apex.tracker.gg/profile/${console}/${name}`, (error, response, html) => {
+        request(`https://apex.tracker.gg/profile/${platform}/${name}`, (error, response, html) => {
             if (response && response.statusCode === 200) {
                 const $ = cheerio.load(html);
 
 
                 /* TODO need to somehow wait before we parse this part */
 
-                let result = {name: name, platform: console};
+                let result = {name: name, platform: platform};
                 let legendsData = [];
                 let lifetime = {};
+
+                let socials = [];
+
+                $('div.trn-profile-header__action.trn-profile-header__action-left').find('a').each((i, el) => {
+                    socials.push($(el).attr('href'));
+                });
+
+                result.socials = socials;
                 result.profileImage = $('div.trn-profile-header__avatar').find('img').attr('src');
                 $('div.trn-card__content').find('div.trn-defstat.trn-defstat--large').each((i, el) => {
                     let key = null;
                     let stat = {};
-                    $(el).children('div').each((i2, child) =>{
+                    $(el).children('div').each((i2, child) => {
                         if (i2 === 0) {
                             key = cleanData($(child).text());
-                        } else if(i2 === 1) {
+                        } else if (i2 === 1) {
                             stat.value = cleanData($(child).text());
                         } else if (i2 === 2) {
                             stat.rank = cleanData($(child).text());
@@ -90,7 +155,6 @@ function playerStats(console, name) {
                 result.lifetime = lifetime;
 
 
-
                 $('div.trn-card').find('div.ap-legend-stats').each((i, el) => {
                     let obj = {};
                     $(el).siblings('div').each((i1, header) => {
@@ -99,11 +163,11 @@ function playerStats(console, name) {
                     $(el).find('div.trn-defstat').each((i2, stats) => {
                         let key = null;
                         $(stats).find('div').each((i3, data) => {
-                            if(i3 === 0) {
+                            if (i3 === 0) {
                                 key = cleanData($(data).text()).toLowerCase();
-                            } else if(i3 === 1) {
+                            } else if (i3 === 1) {
                                 obj[key] = cleanData($(data).text());
-                            } else if(i3 === 2) {
+                            } else if (i3 === 2) {
                                 obj.rank = cleanData($(data).text());
                             }
                         });
