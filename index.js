@@ -2,8 +2,9 @@ const request = require('request');
 const cheerio = require('cheerio');
 const express = require('express');
 const app = express();
-const port = process.env.PORT || 8000;
+const port = process.env.PORT || 8010;
 const cors = require('cors');
+const _ = require('lodash');
 app.use(cors());
 
 app.get('/leaderboard', (req, res) => {
@@ -94,7 +95,7 @@ app.get('/matches', (req, res) => {
             const $ = cheerio.load(html);
             $('div.trn-card.trn-card--dark.ap-match').each((i, match) => {
                 let obj = {};
-                obj.title = cleanData($(match).find('span').text());
+                obj.title = cleanData($(match).find('span.ap-match__title').text());
                 let stats = {};
                 $(match).find('div.trn-defstat').each((_, stat) => {
                     let key = null;
@@ -108,6 +109,33 @@ app.get('/matches', (req, res) => {
                 });
                 obj.stats = stats;
                 result.push(obj);
+            });
+            res.status(200).send(result);
+        } else {
+            res.status(500).send(error);
+        }
+    });
+});
+
+
+app.get('/gunStats', (req, res) => {
+    request(`https://rankedboost.com/apex-legends/best-weapons-tier-list/`, (error, response, html) => {
+        if (response && response.statusCode === 200) {
+            const result = [];
+            const $ = cheerio.load(html);
+            const titles = [];
+            $('th').each((i, el) => {
+               titles.push(cleanData($(el).text()).toLowerCase());
+            });
+            titles[0] = 'name';
+            $('tr').each((i, el) => {
+                let obj = {};
+                $(el).find('td').each((index, col) => {
+                    obj[titles[index]] = cleanData($(col).text());
+                });
+                if(!_.isEmpty(obj)) {
+                    result.push(obj);
+                }
             });
             res.status(200).send(result);
         } else {
