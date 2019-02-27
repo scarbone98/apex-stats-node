@@ -2,7 +2,7 @@ const request = require('request');
 const cheerio = require('cheerio');
 const express = require('express');
 const app = express();
-const port = process.env.PORT || 8010;
+const port = process.env.PORT || 8000;
 const cors = require('cors');
 const _ = require('lodash');
 app.use(cors());
@@ -95,7 +95,13 @@ app.get('/matches', (req, res) => {
             const $ = cheerio.load(html);
             $('div.trn-card.trn-card--dark.ap-match').each((i, match) => {
                 let obj = {};
-                obj.title = cleanData($(match).find('span.ap-match__title').text());
+                let title = cleanData($(match).find('span.ap-match__title').text()).split("-");
+                obj.name = title[0].trim();
+                const times = title[1].trim().split(" ");
+                obj.time = {
+                    date: times[0],
+                    hour: `${times[1]}${times[2]}`
+                };
                 let stats = {};
                 $(match).find('div.trn-defstat').each((_, stat) => {
                     let key = null;
